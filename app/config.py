@@ -23,9 +23,27 @@ class Settings(BaseSettings):
     # # 其他LLM配置（可选）
     # ANTHROPIC_API_KEY: Optional[str] = None
     # GROQ_API_KEY: Optional[str] = None
+
+    # 数据库配置
+    # DATABASE_HOST: str = "localhost"
+    DATABASE_HOST: str = "47.119.18.45"
+    DATABASE_PORT: int = 3306
+    DATABASE_USER: str = "root"
+    DATABASE_PASSWORD: str = "admin123."
+    DATABASE_NAME: str = "fast_agent"
+
+    # 数据库URL（可选，如果设置了会覆盖上面的配置）
+    DATABASE_URL: Optional[str] = None
     
     # 安全配置
     CORS_ORIGINS: list = ["*"]
+
+    @property
+    def database_url(self) -> str:
+        """获取数据库连接URL"""
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        return f"mysql+pymysql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
     
     class Config:
         env_file = ".env"
