@@ -26,11 +26,11 @@ class Settings(BaseSettings):
 
     # 数据库配置
     # DATABASE_HOST: str = "localhost"
-    DATABASE_HOST: str = "47.119.18.45"
+    DATABASE_HOST: str = "YOUR_DB_HOST"
     DATABASE_PORT: int = 3306
-    DATABASE_USER: str = "root"
-    DATABASE_PASSWORD: str = "admin123."
-    DATABASE_NAME: str = "fast_agent"
+    DATABASE_USER: str = "YOUR_DB_USER"
+    DATABASE_PASSWORD: str = "YOUR_DB_PASSWORD"
+    DATABASE_NAME: str = "YOUR_DB_NAME"
 
     # 数据库URL（可选，如果设置了会覆盖上面的配置）
     DATABASE_URL: Optional[str] = None
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
         """获取数据库连接URL"""
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"mysql+pymysql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
+        return f"mysql+pymysql://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}?charset=utf8mb4"
     
     class Config:
         env_file = ".env"

@@ -28,7 +28,7 @@ class UserService:
         return hashed.decode('utf-8')
     
     @staticmethod
-    def _verify_password(cls, plain_password: str, hashed_password: str) -> bool:
+    def _verify_password(plain_password: str, hashed_password: str) -> bool:
         """验证密码"""
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
@@ -36,6 +36,7 @@ class UserService:
     async def create_user(cls, db: Session, user_data: UserCreate) -> UserResponse:
         """创建新用户"""
 
+        # 检查用户名是否已存在
         existing_user = db.query(UserDB).filter(
             (UserDB.username == user_data.username) | 
             (UserDB.email == user_data.email)
@@ -47,12 +48,6 @@ class UserService:
             else:
                 raise ValueError("用户名已存在")
 
-        # 检查用户名是否已存在
-        for existing_user in cls._users_db.values():
-            if existing_user.username == user_data.username:
-                raise ValueError("用户名已存在")
-            if existing_user.email == user_data.email:
-                raise ValueError("邮箱已存在")
         
         # 哈希密码
         hashed_password = cls._hash_password(user_data.password)
@@ -104,7 +99,7 @@ class UserService:
         is_active: Optional[bool] = None
     ) -> UserListResponse:
         """获取用户列表，支持分页"""
-        users = db.query(UserDB).all()
+        users = db.query(UserDB)
         
         # 过滤激活状态
         if is_active is not None:
@@ -152,7 +147,7 @@ class UserService:
     
     @classmethod
     async def pseudo_delete_user(cls, user_id: str, db: Session) -> bool:
-        """(伪)删除用户"""
+        """软删除用户"""
         user = db.query(UserDB).filter(UserDB.id == user_id).first()
         if user:
             user.is_active = False

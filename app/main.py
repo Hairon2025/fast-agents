@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import users, health
 from app.config import settings
+from app.database.mysql_db import engine, Base
+from app.database.models_db.users_model import UserDB  # 导入模型
 import logging
 import uvicorn
 
@@ -13,6 +15,16 @@ logging.basicConfig(
 
 def create_application() -> FastAPI:
     """创建FastAPI应用"""
+
+    # 自动创建表（仅在开发环境）
+    if settings.DEBUG:
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("数据库表创建/检查完成")
+            logging.info("数据库表创建/检查完成")
+        except Exception as e:
+            logging.warning(f"数据库表创建失败: {e}")
+
     application = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,

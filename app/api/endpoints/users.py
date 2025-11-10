@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.user import UserCreate, UserUpdate, UserResponse, UserListResponse
 from app.services.user_service import UserService
-from app.database import get_db
+from app.database.mysql_db import get_db
 
 router = APIRouter()
 
