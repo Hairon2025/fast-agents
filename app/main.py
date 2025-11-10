@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import users, health
 from app.config import settings
 from app.database.mysql_db import engine, Base
-from app.database.models_db.users_model import UserDB  # 导入模型
+from app.router_registry import auto_register_routers
 import logging
 import uvicorn
 
@@ -42,18 +42,8 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # 包含路由
-    application.include_router(
-        health.router,
-        prefix=settings.API_PREFIX,
-        tags=["health"]
-    )
-    
-    application.include_router(
-        users.router,
-        prefix=settings.API_PREFIX + "/users",
-        tags=["users"]
-    )
+    # 自动注册路由
+    auto_register_routers(application)
     
     # 根路径
     @application.get("/")

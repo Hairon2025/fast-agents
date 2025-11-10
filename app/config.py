@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # 应用配置
     APP_NAME: str = "Agent API"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    DEBUG: bool = True
     
     # API配置
     API_HOST: str = "0.0.0.0"
