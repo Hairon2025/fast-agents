@@ -67,3 +67,20 @@ class UserListResponse(BaseModel):
     total: int = Field(..., description="用户总数")
     page: int = Field(..., description="当前页码")
     size: int = Field(..., description="每页大小")
+
+    # 认证相关模型
+class Token(BaseModel):
+    """Token响应模型"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+class TokenData(BaseModel):
+    """Token数据模型"""
+    username: Optional[str] = None
+    user_id: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    """登录请求模型"""
+    username: str
+    password: str

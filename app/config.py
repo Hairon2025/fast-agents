@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # 应用配置
     APP_NAME: str = "Agent API"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # API配置
     API_HOST: str = "0.0.0.0"
@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     
     # 安全配置
     CORS_ORIGINS: list = ["*"]
+
+    # JWT配置
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"  # 生产环境要修改
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # token过期时间（分钟）
 
     @property
     def database_url(self) -> str:

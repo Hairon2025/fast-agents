@@ -1,11 +1,11 @@
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from sqlalchemy.orm import Session
 from app.database.models_db.users_model import UserDB
 # from app.config import settings
-from app.models.user import UserCreate, UserUpdate, UserInDB, UserResponse, UserListResponse
-import bcrypt
+from app.models.user import UserCreate, UserUpdate, UserResponse, UserListResponse, LoginRequest
+from app.tools.security import PasswordManager, JWTManager
 
 class UserService:
     """用户服务类，处理用户相关操作"""
@@ -19,18 +19,6 @@ class UserService:
     def _get_current_time(cls) -> datetime:
         """获取当前时间"""
         return datetime.now()
-    
-    @staticmethod
-    def _hash_password(password: str) -> str:
-        """使用bcrypt哈希密码"""
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-        return hashed.decode('utf-8')
-    
-    @staticmethod
-    def _verify_password(plain_password: str, hashed_password: str) -> bool:
-        """验证密码"""
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
     @classmethod
     async def create_user(cls, db: Session, user_data: UserCreate) -> UserResponse:
@@ -50,7 +38,7 @@ class UserService:
 
         
         # 哈希密码
-        hashed_password = cls._hash_password(user_data.password)
+        hashed_password = PasswordManager.get_password_hash(user_data.password)
 
         user_in_db = UserDB(
             username=user_data.username,
@@ -76,20 +64,58 @@ class UserService:
         return None
     
     @classmethod
-    async def get_user_by_username(cls, db: Session, username: str) -> Optional[UserResponse]:
+    async def get_user_by_username(cls, db: Session, username: str) -> Optional[UserDB]:
         """根据用户名获取用户（内部使用，返回完整数据库模型）"""
         return db.query(UserDB).filter(UserDB.username == username).first()
     
     @classmethod
-    async def authenticate_user(cls, db: Session, username: str, password: str) -> Optional[UserResponse]:
+    async def authenticate_user(cls, db: Session, login_data: LoginRequest) -> Optional[UserDB]:
         """用户认证"""
-        db_user = await cls.get_user_by_username(db, username)
+        db_user = await cls.get_user_by_username(db, login_data.username)
         if not db_user:
             return None
-        if not cls._verify_password(password, db_user.hashed_password):
+        if not PasswordManager.verify_password(login_data.password, db_user.hashed_password):
             return None
-        return cls._db_to_response(db_user)
+        return db_user
     
+    @classmethod
+    async def login_user(cls, db: Session, login_data: LoginRequest) -> Optional[dict]:
+        """用户登录，返回token"""
+        db_user = await cls.authenticate_user(db, login_data)
+        if not db_user:
+            return None
+        
+        # 创建access token
+        access_token_expires = timedelta(minutes=30)
+        access_token = JWTManager.create_access_token(
+            data={"sub": db_user.username, "user_id": db_user.id},
+            expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": access_token_expires.total_seconds(),
+            "user": cls._db_to_response(db_user)
+        }
+    
+    @classmethod
+    async def get_current_user(cls, db: Session, token: str) -> Optional[UserResponse]:
+        """根据token获取当前用户"""
+        payload = JWTManager.verify_token(token)
+        if not payload:
+            return None
+        
+        username: str = payload.get("sub")
+        user_id: str = payload.get("user_id")
+        if username is None or user_id is None:
+            return None
+        
+        db_user = await cls.get_user_by_username(db, username)
+        if db_user and db_user.id == user_id and db_user.is_active:
+            return cls._db_to_response(db_user)
+        return None
+
     @classmethod
     async def get_users(
         cls, 
@@ -133,7 +159,7 @@ class UserService:
         for field, value in update_data.items():
             if field == 'password':
                 # 特殊处理密码更新
-                setattr(user, 'hashed_password', cls._hash_password(value))
+                setattr(user, 'hashed_password', PasswordManager.get_password_hash(value))
             else:
                 setattr(user, field, value)
 
