@@ -9,3 +9,5 @@ __pycache__/
 fast-agent/
 
 test/
+
+data/vector_stores/

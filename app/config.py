@@ -13,6 +13,22 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     API_PREFIX: str = "/api/v1"
+
+    # RAG 相关配置
+    TONYIQWEN_API_KEY: Optional[str] = "YOUR_TONYIQWEN_API_KEY"
+    OPENAI_BASE_URL: Optional[str] = "YOUR_OPENAI_BASE_URL"  # 如果用第三方代理
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_MODEL_KEY: Optional[str] = "YOUR_EMBEDDING_MODEL_KEY"
+    LLM_MODEL: str = "YOUR_LLM_MODEL"
+
+    # 向量数据库配置
+    VECTOR_STORE_PATH: str = "./data/vector_store"
+    PDF_STORAGE_PATH: str = "./data/pdfs"
+    
+    # RAG 参数
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+    SIMILARITY_TOP_K: int = 5
     
     # # Agent配置
     # AGENT_MODEL_NAME: str = "gpt-3.5-turbo"
@@ -25,7 +41,7 @@ class Settings(BaseSettings):
     # GROQ_API_KEY: Optional[str] = None
 
     # 数据库配置
-    # DATABASE_HOST: str = "localhost"
+    DATABASE_HOST: str = "localhost"
     DATABASE_HOST: str = "YOUR_DB_HOST"
     DATABASE_PORT: int = 3306
     DATABASE_USER: str = "YOUR_DB_USER"
