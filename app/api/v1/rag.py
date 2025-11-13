@@ -112,3 +112,50 @@ async def search_documents(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"搜索文档失败: {str(e)}")
+    
+
+@router.post("/api/v1/rag/init-zengshan")
+async def init_zengshan_document(
+    file_path: str, 
+    title: str, 
+    description: str = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """
+    上传《增删卜易》文档
+    
+    参数:
+    - file: 上传的文件
+    - title: 文档标题
+    - description: 文档描述（可选）
+
+    返回: 文档处理结果
+
+    """
+    if not title:
+        raise HTTPException(status_code=400, detail="文档标题不能为空")
+
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"文件不存在: {file_path}")
+
+    response = await rag_service.process_zengshan_document(file_path, title, description)
+    
+    return response
+
+@router.post("/api/v1/rag/ask-zengshan")
+async def ask_zengshan_question(
+    question: str, 
+    volume: str = None, 
+    chapter: str = None,
+    current_user: dict = Depends(get_current_user)    
+):
+    """提问《增删卜易》相关问题"""
+    
+    response = await rag_service.generate_zengshan_answer(
+        question=question,
+        volume_filter=volume,
+        chapter_filter=chapter
+    )
+    
+    return response

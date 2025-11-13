@@ -6,7 +6,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-def auto_register_routers(app: FastAPI, package_name: str = "app.api.endpoints"):
+def auto_register_routers(app: FastAPI, package_name: str = "app.api.v1"):
     """
     自动注册路由
     

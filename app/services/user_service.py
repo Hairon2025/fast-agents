@@ -2,8 +2,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import uuid
 from sqlalchemy.orm import Session
-from app.database.models_db.users_model import UserDB
 # from app.config import settings
+from app.database.models_db.users_model import UserDB
 from app.models.user import UserCreate, UserUpdate, UserResponse, UserListResponse, LoginRequest
 from app.tools.security import PasswordManager, JWTManager
 

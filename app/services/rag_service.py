@@ -5,6 +5,7 @@ from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter, CharacterTextSplitter
 from langchain_core.documents import Document
+from app.utils.doc_preprocessor import ZengShanBuYiPreprocessor
 from app.models.rag import PDFUploadResponse, AnswerResponse
 from datetime import datetime
 from app.config import settings
@@ -51,6 +52,8 @@ class RAGService:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger("RAGService")
+
+        self.zengshan_preprocessor = ZengShanBuYiPreprocessor()
 
     def _initialize_vector_store(self) -> Chroma:
         """
@@ -371,3 +374,257 @@ class RAGService:
         except Exception as e:
             self.logger.error(f"清空向量数据库失败: {str(e)}")
             return False
+        
+    async def process_zengshan_document(self, file_path: str, title: str, 
+                                      description: Optional[str] = None) -> PDFUploadResponse:
+        """
+        专门处理《增删卜易》文档
+        
+        Args:
+            file_path: 文件路径
+            title: 文档标题
+            description: 文档描述
+            
+        Returns:
+            PDFUploadResponse: 处理结果
+        """
+        try:
+            doc_id = str(uuid.uuid4())
+            
+            self.logger.info(f"开始处理《增删卜易》文档: {title}")
+            
+            # 1. 使用专用预处理器提取和解析文本
+            document_data = self.zengshan_preprocessor.extract_text_from_pdf(file_path)
+            
+            # 2. 创建语义完整的知识块
+            chunks = self.zengshan_preprocessor.create_semantic_chunks(document_data)
+            
+            # 3. 添加文档元数据
+            for chunk in chunks:
+                chunk.metadata.update({
+                    "doc_id": doc_id,
+                    "book": "增删卜易",
+                    "original_title": title,
+                    "description": description or "",
+                    "content_language": "文言文",
+                    "content_era": "清代",
+                    "document_type": "易学经典"
+                })
+            
+            # 4. 存储到向量数据库
+            self._add_documents_to_vector_store(chunks, doc_id)
+            
+            # 统计信息
+            volume_count = len(document_data["structure"]["volumes"])
+            chapter_count = sum(len(vol["chapters"]) for vol in document_data["structure"]["volumes"])
+            
+            return PDFUploadResponse(
+                id=doc_id,
+                title=title,
+                filename=os.path.basename(file_path),
+                upload_time=datetime.now(),
+                status="success",
+                message=f"《增删卜易》处理成功：{volume_count}卷 {chapter_count}章，生成 {len(chunks)} 个语义块"
+            )
+            
+        except Exception as e:
+            self.logger.error(f"《增删卜易》处理失败: {str(e)}")
+            raise Exception(f"文档处理失败: {str(e)}")
+        
+    def _split_documents(self, documents: List[Document]) -> List[Document]:
+        """
+        智能文档分割
+        
+        Args:
+            documents: 待分割的文档列表
+            
+        Returns:
+            List[Document]: 分割后的文本块列表
+        """
+        if not documents:
+            return []
+            
+        # 检查是否为《增删卜易》
+        is_zengshan = any("增删卜易" in doc.metadata.get("title", "") or 
+                         "增删卜易" in doc.page_content for doc in documents)
+        
+        if is_zengshan:
+            self.logger.info("检测到《增删卜易》文档，使用专用分块策略")
+            # 对于已经预处理过的文档，直接返回
+            return documents
+        else:
+            self.logger.info("使用通用分块策略")
+            return self.text_splitter.split_documents(documents)
+        
+    def search_zengshan_documents(self, query: str, k: int = 5, 
+                            volume_filter: str = None,
+                            chapter_filter: str = None,
+                            content_type: str = None) -> List[Document]:
+        """
+        搜索《增删卜易》文档，支持多种过滤条件
+        
+        Args:
+            query: 查询文本
+            k: 返回数量
+            volume_filter: 卷过滤
+            chapter_filter: 章节过滤
+            content_type: 内容类型过滤（目录、序言、章节等）
+            
+        Returns:
+            List[Document]: 相似的文档列表
+        """
+        try:
+            # 构建过滤器
+            filter_dict = {"book": "增删卜易"}
+            if volume_filter:
+                filter_dict["volume_index"] = volume_filter
+            if chapter_filter:
+                filter_dict["chapter_index"] = chapter_filter
+            if content_type:
+                filter_dict["content_type"] = content_type
+                
+            self.logger.info(f"搜索《增删卜易》，过滤器: {filter_dict}")
+            
+            if filter_dict:
+                results = self.vector_store.similarity_search(
+                    query, k=k, filter=filter_dict
+                )
+            else:
+                results = self.vector_store.similarity_search(query, k=k)
+                
+            self.logger.info(f"找到 {len(results)} 个相关文档片段")
+            
+            # 按结构排序：卷 -> 章 -> 段落
+            results.sort(key=lambda x: (
+                x.metadata.get("volume_index", "999"),
+                x.metadata.get("chapter_index", "999"),
+                x.metadata.get("paragraph_index", 999),
+                x.metadata.get("content_type", "z")
+            ))
+            
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"文档搜索失败: {str(e)}")
+            return []
+
+    async def generate_zengshan_answer(self, question: str, 
+                                    context_documents: List[Document] = None,
+                                    volume_filter: str = None,
+                                    chapter_filter: str = None) -> AnswerResponse:
+        """
+        基于《增删卜易》生成专业答案
+        
+        Args:
+            question: 用户问题
+            context_documents: 上下文文档列表
+            volume_filter: 卷过滤
+            chapter_filter: 章节过滤
+            
+        Returns:
+            AnswerResponse: 生成的答案响应
+        """
+        start_time = time.time()
+        
+        try:
+            # 检索相关文档
+            if not context_documents:
+                context_documents = self.search_zengshan_documents(
+                    question, k=5, 
+                    volume_filter=volume_filter,
+                    chapter_filter=chapter_filter
+                )
+            
+            # 构建详细的上下文信息
+            context_parts = []
+            sources_info = []
+            
+            for i, doc in enumerate(context_documents):
+                # 构建来源信息
+                source_desc = self._build_source_description(doc)
+                
+                source_info = {
+                    "source": source_desc,
+                    "volume": doc.metadata.get("volume_title"),
+                    "chapter": doc.metadata.get("chapter_title"),
+                    "content_type": doc.metadata.get("content_type"),
+                    "block_type": doc.metadata.get("block_type"),
+                    "content_preview": doc.page_content[:150] + "..." if len(doc.page_content) > 150 else doc.page_content
+                }
+                sources_info.append(source_info)
+                
+                # 构建上下文内容
+                context_part = f"[来源 {i+1}: {source_desc}]\n{doc.page_content}"
+                context_parts.append(context_part)
+            
+            context_text = "\n\n".join(context_parts)
+            
+            # 构建针对《增删卜易》的专业提示词
+            prompt = f"""你是一位精通《增删卜易》的易学专家。请基于以下上下文信息回答问题。
+
+    《增删卜易》上下文信息：
+    {context_text}
+
+    问题：{question}
+
+    要求：
+    1. 基于《增删卜易》的原文内容给出准确答案
+    2. 对于文言文内容，请提供适当的现代文解释
+    3. 如果涉及卜卦方法，请详细说明操作步骤
+    4. 如果上下文信息不足，请如实说明
+    5. 回答要专业、准确、清晰，体现易学专家的水平
+
+    请开始回答："""
+
+            # 生成答案
+            self.logger.info("正在调用LLM生成专业答案")
+            response = await self.llm.ainvoke(prompt)
+            answer = response.content if hasattr(response, 'content') else str(response)
+            
+            # 计算处理时间
+            processing_time = round(time.time() - start_time, 2)
+            
+            self.logger.info(f"《增删卜易》答案生成成功，处理时间: {processing_time}秒")
+            
+            return AnswerResponse(
+                question=question,
+                answer=answer,
+                sources=sources_info,
+                processing_time=processing_time,
+                status="success"
+            )
+            
+        except Exception as e:
+            processing_time = round(time.time() - start_time, 2)
+            self.logger.error(f"答案生成失败: {str(e)}")
+            
+            return AnswerResponse(
+                question=question,
+                answer="抱歉，生成答案时出现错误，请稍后重试。",
+                sources=[],
+                processing_time=processing_time,
+                status="error",
+                error_message=str(e)
+            )
+
+    def _build_source_description(self, doc: Document) -> str:
+        """构建来源描述"""
+        parts = []
+        
+        if doc.metadata.get("volume_title"):
+            parts.append(doc.metadata["volume_title"])
+        
+        if doc.metadata.get("chapter_title"):
+            parts.append(doc.metadata["chapter_title"])
+        
+        if doc.metadata.get("content_type"):
+            content_type_map = {
+                "目录": "目录",
+                "序言": "序言", 
+                "卷标题": "卷首",
+                "章节": "正文",
+                "章节段落": "段落"
+            }
+            parts.append(content_type_map.get(doc.metadata["content_type"], doc.metadata["content_type"]))
+        
+        return " · ".join(parts)

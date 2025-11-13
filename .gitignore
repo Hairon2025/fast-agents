@@ -10,4 +10,4 @@ fast-agent/
 
 test/
 
-data/vector_stores/
+data/vector_store/

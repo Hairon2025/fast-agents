@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import users, health
 from app.config import settings
 from app.database.mysql_db import engine, Base
-from app.router_registry import auto_register_routers
+from app.core.router_registry import auto_register_routers
 import logging
 import uvicorn
 
